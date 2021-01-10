@@ -1,0 +1,24 @@
+/*  */
+
+#main_map {
+    height: 600px;
+}
+
+body {
+    background-image: url("https://images6.alphacoders.com/549/thumb-1920-549198.jpg");
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    height: 100vh;
+    /*funcion que ajusta la altura a la pantalla*/
+    min-height: 60rem;
+}
+
+.card {
+    background-color: #7c42007e;
+    color: aliceblue;
+}
+
+.bg-personal-dark {
+    background-color: #0000005e;
+}

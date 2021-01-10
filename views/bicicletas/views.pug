@@ -1,0 +1,29 @@
+extends ../layout
+
+block content   
+    .container.my-5
+        .row
+            .col.col-6.offset-2
+                a.btn.btn-primary.my-5(href='/bicicletas') Volver
+
+                .card(style="width: 38rem;")
+                    .card-header.text-center
+                        h1  Nueva Bicicleta
+                    .card-body
+                        form(action=`/bicicletas/${bici.id}/update` method='post')
+                            .form-group
+                                label(for='id') ID:
+                                input.form-control#id(disabled type='text' name='id' value=bici.id)
+                            .form-group
+                                label(for='color') Color:
+                                input.form-control#color(disabled type='text' name='color' value=bici.color)
+                            .form-group
+                                label(for='modelo') Modelo:
+                                input.form-control#modelo(disabled type='text' name='modelo' value=bici.modelo)
+                            .form-group
+                                label(for='lat') Latitud:
+                                input.form-control#lat(disabled type='text' name='lat' value=bici.ubicacion[0])
+                            .form-group
+                                label(for='lng') Longitud:
+                                input.form-control#lng(disabled type='text' name='lng' value=bici.ubicacion[1])
+                                br

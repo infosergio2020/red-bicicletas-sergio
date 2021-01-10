@@ -1,0 +1,30 @@
+extends ../layout
+
+block content   
+    .container.my-5
+        .row
+            .col.col-6.offset-2
+                a.btn.btn-primary.my-5(href='/bicicletas') Volver
+
+                .card(style="width: 38rem;")
+                    .card-header.text-center
+                        h1  Nueva Bicicleta
+                    .card-body
+                        form(action='/bicicletas/create' method='post')
+                            .form-group
+                                label(for='code') Código:
+                                input.form-control#id(type='text' name='code')
+                            .form-group
+                                label(for='color') Color:
+                                input.form-control#color(type='text' name='color')
+                            .form-group
+                                label(for='modelo') Modelo:
+                                input.form-control#modelo(type='text' name='modelo')
+                            .form-group
+                                label(for='lat') Latitud:
+                                input.form-control#lat(type='text' name='lat')
+                            .form-group
+                                label(for='lng') Longitud:
+                                input.form-control#lng(type='text' name='lng')
+                                br
+                            input.btn.btn-primary(type='submit' value='OK')
