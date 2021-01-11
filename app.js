@@ -19,7 +19,6 @@ var bicicletasAPIRouter = require('./routes/api/bicicletas');
 var usuariosAPIRouter = require('./routes/api/usuarios');
 var authApiRouter = require('./routes/api/auth');
 
-
 var Usuario = require('./models/usuario');
 var Token = require('./models/token');
 
