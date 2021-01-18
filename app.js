@@ -147,20 +147,16 @@ app.use('/api/usuarios',validarUsuario, usuariosAPIRouter);
 app.use('/api/auth', authApiRouter);
 
 app.use('/privacy_policy', function (req, res) {
-  res.sendfile('public/privacy_policy.html');
+  res.sendFile('public/privacy_policy.html');
 });
+/*************************/
+/***********   API   *****/
+/*************************/
+app.use('/google4462013f65f1eee7', function (req, res) { res.sendFile('public/google4462013f65f1eee7.html'); });
 
-app.use('/googlecdc429ad966eabd7', function (req, res) {
-  res.sendfile('public/googlecdc429ad966eabd7.html');
-});
+app.get('/auth/google', passport.authenticate('google', { scope: ['email', 'profile'] }));
 
-app.get('/auth/google', passport.authenticate('google', { scope: ['openid', 'email', 'profile'] }));
-
-app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login' }),
-    function(req, res) {
-      // Successful authentication, redirect home.
-      res.redirect('/');
-});
+app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/error', successRedirect: '/'}), function(req, res) { res.redirect('/'); });
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

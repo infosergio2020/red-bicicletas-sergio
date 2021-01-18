@@ -1,15 +1,20 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-const Usuario = require('../models/usuario');
 var GoogleStrategy = require('passport-google-oauth20').Strategy;
 var FacebookTokenStrategy = require('passport-facebook-token');
+const Usuario = require('../models/usuario');
 
-passport.use(new LocalStrategy(
-    function(email, password, done){
+passport.use(new LocalStrategy( function(email, password, done){
         Usuario.findOne({email: email}, function(err, usuario) {
-            if(err) return done(err);
-            if(!usuario) return done(null, false, {message:'email no existe o incorrecto'});
-            if(!usuario.validPassword(password)) return done(null, false, {message:'password incorrecto'});
+            if(err) {
+                return done(err);
+            }
+            if(!usuario){
+                return done(null, false, {message:'email no existe o incorrecto'});
+            }
+            if(!usuario.validPassword(password)) {
+                return done(null, false, {message:'password incorrecto'});
+            }
             return done(null, usuario);
         });
     }
@@ -20,10 +25,10 @@ passport.use(new GoogleStrategy({
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: process.env.PORTAL_URL + "/auth/google/callback"
     },
-    function(accessToken, refreshToken, profile, cb) {
+    function(request,accessToken, refreshToken, profile, done) {
         console.log(profile);
-        Usuario.findOneOrCreateByGoogle(profile, function (err, user) {
-            return cb(err, user);
+        Usuario.findOrCreateByGoogle(profile, function (err, user) {
+            return done(err, user);
         });
     }
 ));
@@ -31,17 +36,18 @@ passport.use(new GoogleStrategy({
 passport.use(new FacebookTokenStrategy({
         clientID: process.env.FACEBOOK_ID,
         clientSecret: process.env.FACEBOOK_SECRET,
+        callbackURL: process.env.PORTAL_URL+"/auth/facebook/callback"
     },
-    function(accessToken, refreshToken, profile, done) {
+    function(accessToken, refreshToken, profile, cb) {
         try {
             console.log(profile);
-            Usuario.findOneOrCreateByFacebook(profile, function (err, user) {
+            Usuario.findOrCreateByFacebook(profile, function (err, user) {
                 if (err) console.log('err' + err);
-                return done(err, user);
+                return cb(err, user);
             });
         } catch (err2) {
             console.log(err2);
-            return done(err2, null);
+            return cb(err2, null);
         }
     }
 ));

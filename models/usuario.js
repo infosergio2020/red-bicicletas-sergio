@@ -1,21 +1,23 @@
 var mongoose = require('mongoose');
 const uniqueValidator = require('mongoose-unique-validator');
 var Reserva = require('./reserva');
-var Schema = mongoose.Schema;
-
-const bcrypt = require('bcrypt');
-const saltRound = 10;
-var crypto = require('crypto');
-
 var Token = require('./token');
+const bcrypt = require('bcrypt');
+var crypto = require('crypto');
+const saltRound = 10;
 const mailer = require('../mailer/mailer');
+const emailRegex = /^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
+
 
 const validateEmail = function (email) {
-    const re = /^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
-    return re.test(email);
+    return emailRegex.test(email);
 }
 
-var usuarioSchema = new Schema({
+const requiredPassword = function () {
+    return this.verificado == true;
+}
+
+var usuarioSchema = new mongoose.Schema({
     nombre: {
         type:String,
         trim: true,
@@ -26,13 +28,14 @@ var usuarioSchema = new Schema({
         trim: true,
         required: [true, 'El email es obligatorio'],
         lowercase: true,
+        unique: true,
         validate: [validateEmail, 'Por favor ingrese un correo electrónico válido'],
-        match: [/^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i],
-        unique: true
+        match: [emailRegex]
     },
     password: {
         type: String,
-        required: [true, 'La contraseña es obligatoria']
+        required: [true, 'La contraseña es obligatoria'],
+        default: ''
     },
     passwordResetToken: String,
     passwordResetTokenExpires: Date,
@@ -51,48 +54,144 @@ usuarioSchema.pre('save', function (next) {
         this.password = bcrypt.hashSync(this.password, saltRound);
     }
     next();
-})
+});
 
-usuarioSchema.methods.validPassword = function(password){
-    var result = bcrypt.compareSync(password, this.password);
-    if (result) {
-        console.log("Password correcto");
-    } else {
-        console.log("Password incorrecto");
-    }
-    return result;
+/*uitilidades*/
+usuarioSchema.methods.toString = function () {
+    return `nombre: ${this.nombre} | email: ${this.email}`;
+}
+
+/*CRUD Basico BEGIN***************************************/
+usuarioSchema.statics.getAll = function (callback) {
+    return this.find({}, callback);
+}
+
+usuarioSchema.statics.createInstance = function (nombre, email) {
+    return new this({
+        nombre,
+        email
+    });
+}
+
+usuarioSchema.statics.add = function (usuario, callback) {
+    return this.create(usuario, callback);
+}
+
+usuarioSchema.statics.getById = function (id, callback) {
+    return this.findOne({ _id: id }, callback);
+}
+
+usuarioSchema.statics.update = function (id, nombre, email, callback) {
+    return this.findOneAndUpdate({ _id: id }, { nombre: nombre, email: email }, { returnNewDocument: true, runValidators: true, context: 'query' }, callback); // alternative use findByIdAndUpdate
+}
+
+usuarioSchema.statics.deleteById = function (id, callback) {
+    return this.deleteOne({ _id: id }, callback);
 }
 
 
 
-usuarioSchema.methods.reservar = function(biciId, desde, hasta, cb){
+/*************************CRUD Basico END******************/
+
+/**************************  Login with google acount ************************/
+usuarioSchema.statics.findOrCreateByGoogle = function (googleProfile, callback){
+    console.log(' --------------- googleProfile ---------------');
+    console.log(googleProfile);
+    const self = this;
+    self.findOne({
+        $or: [{'googleId': googleProfile.id}, {'email': googleProfile.emails[0].value}]
+    }, (err, result) => {
+            if (result){
+                console.log(' --------------- LO ENCONTRE!!! ---------------');
+                callback(err, result)
+            } else {
+                let values = {
+                    googleId: googleProfile.id,
+                    email: googleProfile.emails[0].value,
+                    nombre: googleProfile.displayName || 'SIN NOMBRE',
+                    verificado: true,
+                    password: crypto.randomBytes(16).toString('hex')
+                };
+                console.log(' --------------- VALUES ---------------');
+                console.log(values);
+                self.create(values, (err, result) => {
+                   if (err) { 
+                       return console.log(err.message);
+                    }
+                   return callback(err, result);
+                });
+            }
+        });
+};
+
+
+/****************************** Login with facebook acount *******************/
+
+usuarioSchema.statics.findOrCreateByFacebook = function (facebookProfile, callback) {
+    console.log(' --------------- facebookProfile ---------------');
+    console.log(facebookProfile);
+    const self = this;
+    self.findOne({
+        $or: [{ 'facebookId': facebookProfile.id }, { 'email': facebookProfile.emails[0].value }]
+    }, (err, result) => {
+        if (result) {
+            return callback(err, result);
+        }
+        else {
+            let values = {
+                facebookId: facebookProfile.id,
+                email: facebookProfile.emails[0].value,
+                nombre: facebookProfile.displayName || 'SIN NOMBRE',
+                verificado: true,
+                password: crypto.randomBytes(16).toString('hex')
+            };
+            console.log(' --------------- VALUES ---------------');
+            console.log(values);
+            self.create(values, (err, result) => {
+                if (err) {
+                    return console.log(err.message);
+                }
+                return callback(err, result);
+            });
+        }
+    });
+}
+
+
+/****************  Utilidades para validacion   **********/
+
+usuarioSchema.methods.validPassword = function(password){
+    return bcrypt.compareSync(password, this.password);
+}
+
+usuarioSchema.methods.reservar = function(biciId, desde, hasta, callback){
     var reserva = new Reserva({usuario: this._id, bicicleta: biciId, desde:desde, hasta: hasta});
     console.log(reserva);
-    reserva.save(cb)
+    reserva.save(callback);
 };
 
 usuarioSchema.methods.enviar_email_bienvenida = function (cb) {
     const token = new Token({_userId: this._id,token: crypto.randomBytes(16).toString('hex')});
-    const email_destination = this.email;
-
-    console.log('token => ' + token);
-    console.log('email destination => ' + email_destination);
-
+    const nombreDestination = this.nombre;
+    const emailDestination = this.email;
     token.save(function( err ){
         if( err ) { return console.log(err.message); }
 
         const mailOptions = {
-            from: 'no-reply@redbicicleta.com',
-            to: email_destination,
+            from: process.env.NODEMAILER_FROM,
+            to: emailDestination,
             subject: 'Verificación de cuenta',
-            text: 'Hola, \n\n'+' para verificar su cuenta haga click en este enlace: \n' + process.env.PORTAL_URL + '\/token/confirmation\/'+token.token + '\n'
+            text: `Hola ${nombreDestination}, \n\n` +' para verificar su cuenta haga click en este enlace: \n' + process.env.PORTAL_URL + '\/token/confirmation\/'+token.token + '\n'
         }
 
-        mailer.sendMail(mailOptions, ( err )=> {
-            if(err) { return console.log(err.message); }
-            console.log('a verification email has been sent to ' + email_destination);
+        mailer.sendMail(mailOptions, function (err){
+            if(err) { 
+                return console.log(err.message); 
+            }
+            console.log('a verification email has been sent to ' + emailDestination);
         });
     });
+    return token;
 };
 
 usuarioSchema.methods.resetPassword = function(cb) {
@@ -115,66 +214,13 @@ usuarioSchema.methods.resetPassword = function(cb) {
         }
 
         mailer.sendMail(mailOptions, ( err )=> {
-            if(err) { return console.log(err.message); }
+            if(err) { 
+                return console.log(err.message); 
+            }
             console.log('A reset password email has been sent to ' + email_destination);
         });
     });
-
-};
-
-usuarioSchema.statics.findOneOrCreateByGoogle = function findOneOrCreate(condition, callback){
-    const self = this;
-    self.findOne({
-        $or: [
-            {'googleId': condition.id}, {'email': condition.emails[0].value}
-        ]}, (err, result) => {
-            if (result){
-                callback(err, result)
-            } else {
-                console.log(' --------------- CONDITION ---------------');
-                console.log(condition);
-                let values = {};
-                values.googleId = condition.id;
-                values.email = condition.emails[0].value;
-                values.nombre = condition.displayName || 'SIN NOMBRE';
-                values.verificado = true;
-                values.password = condition._json.sub;
-                console.log(' --------------- VALUES ---------------');
-                console.log(values);
-                self.create(values, (err, result) => {
-                   if (err) {console.log(err);}
-                   return callback(err, result)
-                });
-            }
-    });
-};
-
-usuarioSchema.statics.findOneOrCreateByFacebook = function findOneOrCreate(condition, callback){
-    const self = this;
-    self.findOne({
-        $or: [
-            {'facebookId': condition.id}, {'email': condition.emails[0].value}
-        ]}, (err, result) => {
-        if (result){
-            callback(err, result)
-        } else {
-            console.log(' --------------- CONDITION ---------------');
-            console.log(condition);
-            let values = {};
-            values.facebookId = condition.id;
-            values.email = condition.emails[0].value;
-            values.nombre = condition.displayName || 'SIN NOMBRE';
-            values.verificado = true;
-            // Aquí se recomienda utilizar la estrategia de login
-            values.password = crypto.randomBytes(16).toString('hex');
-            console.log(' --------------- VALUES ---------------');
-            console.log(values);
-            self.create(values, (err, result) => {
-                if (err) {console.log(err);}
-                return callback(err, result)
-            });
-        }
-    });
+    return token;
 };
 
 module.exports = mongoose.model('Usuario', usuarioSchema);
